@@ -6,7 +6,8 @@ TMPDIR = 'chardumps-tmp'
 SQLFILE = ARGV[0]
 GUID = ARGV[1].to_i
 CHARNAME =  ARGV[2]
-TABLES = %w(characters character_account_data character_achievement character_achievement_progress character_action character_glyphs character_homebind character_inventory character_pet character_queststatus character_queststatus_rewarded character_reputation character_skills character_spell item_instance)
+#character_account_data remove because of bug with macros
+TABLES = %w(characters character_achievement character_achievement_progress character_action character_glyphs character_homebind character_inventory character_pet character_queststatus character_queststatus_rewarded character_reputation character_skills character_spell item_instance)
 
 def getTables
 
@@ -112,7 +113,7 @@ def extractData
         when 'character_spell'
           regexp = /\(#{GUID},\d*,.*\)/
         when 'item_instance'
-          regexp = /\(#{GUID},\d*,.*\)/
+          regexp = /\(\d*,\d*,#{GUID},.*\)/
         else
           return
       end
@@ -135,6 +136,10 @@ end
 
 def createPDump
 
+  regexp = /,(?=(?:[^']*'[^']*')*[^']*$)/
+  regexp2 = /\((?!')/
+  regexp3 = /(?<!')\)/
+
   File.delete("guid_#{GUID}.pdump") if File.exists?("guid_#{GUID}.pdump")
 
   file = File.new("guid_#{GUID}.pdump", 'a')
@@ -142,7 +147,7 @@ def createPDump
   file.puts "IMPORTANT NOTE: THIS DUMPFILE IS MADE FOR USE WITH THE 'PDUMP' COMMAND ONLY - EITHER THROUGH INGAME CHAT OR ON CONSOLE!"
   file.puts 'IMPORTANT NOTE: DO NOT apply it directly - it will irreversibly DAMAGE and CORRUPT your database! You have been warned!'
   file.puts "\n"
-  file.puts "INSERT INTO `characters` VALUES #{File.read("#{TMPDIR}/characters.extract")}"
+  file.puts "INSERT INTO `characters` VALUES #{File.read("#{TMPDIR}/characters.extract").gsub(regexp,'\', \'').gsub(regexp2,'(\'').gsub(regexp3,'\')')}".gsub('\'\'','\'').gsub('NULL','')
 
   Dir.glob("#{TMPDIR}/*.extract").each do|f|
 
@@ -152,7 +157,7 @@ def createPDump
 
       while (line = readFile.gets)
 
-        file.puts "INSERT INTO `#{f.gsub("#{TMPDIR}/",'').gsub('.extract','')}` VALUES #{line}"
+        file.puts "INSERT INTO `#{f.gsub("#{TMPDIR}/",'').gsub('.extract','')}` VALUES #{line.gsub(regexp,'\', \'').gsub(regexp2,'(\'').gsub(regexp3,'\')')}".gsub('\'\'','\'').gsub('NULL','')
 
       end
 
@@ -172,4 +177,3 @@ splitTables
 extractData
 createPDump
 cleanTMP
-
